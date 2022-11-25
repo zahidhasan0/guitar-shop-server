@@ -61,6 +61,22 @@ async function run() {
       console.log(bookings);
       res.send(bookings);
     });
+
+    app.get("/bookings/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { userEmail: email };
+      console.log(email);
+      const bookings = await bookingsCollection.find(query).toArray();
+      console.log(bookings);
+      res.send(bookings);
+    });
+
+    app.get("/users/admin/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      res.send();
+    });
   } finally {
   }
 }
