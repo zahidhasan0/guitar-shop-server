@@ -4,6 +4,7 @@ const cors = require("cors");
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const jwt = require("jsonwebtoken");
+const { query } = require("express");
 require("dotenv").config();
 
 app.use(cors());
@@ -88,9 +89,23 @@ async function run() {
       const allSeller = await usersCollection.find(query).toArray();
       res.send(allSeller);
     });
+    app.get("/allbuyer", async (req, res) => {
+      const email = req.query.email;
+      const query = {
+        role: "buyer",
+      };
+      const allSeller = await usersCollection.find(query).toArray();
+      res.send(allSeller);
+    });
 
     app.post("/users", async (req, res) => {
       const user = req.body;
+      const email = user.email;
+      const query = { email: email };
+      const isUser = await usersCollection.findOne(query);
+      if (isUser) {
+        return res.send({ message: "Users database already have this user" });
+      }
       const users = await usersCollection.insertOne(user);
       console.log(users);
       res.send(users);
