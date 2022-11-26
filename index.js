@@ -78,8 +78,16 @@ async function run() {
       const query = {};
       const advertiseProducts = await advertiseProductsCollection
         .find(query)
+
         .toArray();
       res.send(advertiseProducts);
+    });
+
+    app.post("/advertise", async (req, res) => {
+      const product = req.body;
+      const result = await advertiseProductsCollection.insertOne(product);
+      res.send(result);
+      console.log(result);
     });
 
     app.get("/jwt", async (req, res) => {
@@ -133,6 +141,18 @@ async function run() {
       const user = await usersCollection.findOne(query);
       res.send({ isAdmin: user?.role === "admin" });
     });
+    app.get("/users/buyer/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      res.send({ isBuyer: user?.role === "buyer" });
+    });
+    app.get("/users/seller/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      res.send({ isSeller: user?.role === "seller" });
+    });
 
     app.put("/users/admin/:id", async (req, res) => {
       const userEmail = req.decoded.email;
@@ -143,7 +163,6 @@ async function run() {
         return res.status(403).send({ message: "forbidden access" });
       }
       const id = req.params.id;
-
       const filter = { _id: ObjectId(id) };
       console.log(filter);
       const options = { upsert: true };
