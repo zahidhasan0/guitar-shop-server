@@ -308,7 +308,8 @@ async function run() {
     });
 
     app.get("/wishlist", async (req, res) => {
-      const query = {};
+      const email = req.query.email;
+      const query = { email: email };
       const wishlist = await wishlistCollection.find(query).toArray();
       res.send(wishlist);
     });
