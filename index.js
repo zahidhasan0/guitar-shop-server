@@ -7,6 +7,7 @@ const jwt = require("jsonwebtoken");
 const { query } = require("express");
 require("dotenv").config();
 const ObjectId = require("mongodb").ObjectId;
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 app.use(cors());
 app.use(express.json());
@@ -21,6 +22,7 @@ const client = new MongoClient(uri, {
 
 function verifyJWT(req, res, next) {
   const authHeader = req.headers.authorization;
+
   if (!authHeader) {
     return res.status(401).send({ message: "unauthorized access" });
   }
@@ -47,6 +49,8 @@ async function run() {
       .collection("advertise");
     const usersCollection = client.db("guitarshop").collection("users");
     const bookingsCollection = client.db("guitarshop").collection("bookings");
+    const wishlistCollection = client.db("guitarshop").collection("wishlist");
+    const paymentCollection = client.db("guitarshop").collection("payments");
 
     app.get("/categories", async (req, res) => {
       const query = {};
@@ -57,7 +61,6 @@ async function run() {
     app.post("/allproducts", async (req, res) => {
       const product = req.body;
       const result = await allProductsCollection.insertOne(product);
-      console.log(result);
       res.send(result);
     });
 
@@ -86,15 +89,69 @@ async function run() {
     app.delete("/advertise/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: ObjectId(id) };
-      console.log(query);
+      // console.log(query);
       const result = await advertiseProductsCollection.deleteOne(query);
       res.send(result);
-      console.log(result);
+    });
+
+    app.delete("/allproducts/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await allProductsCollection.deleteOne(query);
+      res.send(result);
     });
 
     app.post("/advertise", async (req, res) => {
       const product = req.body;
       const result = await advertiseProductsCollection.insertOne(product);
+      res.send(result);
+    });
+
+    app.get("/bookings", async (req, res) => {
+      const email = req.query.email;
+      const query = { userEmail: email };
+      const bookings = await bookingsCollection.find(query).toArray();
+      res.send(bookings);
+    });
+
+    app.get("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+
+      const bookings = await bookingsCollection.findOne(query);
+      // console.log(bookings);
+      res.send(bookings);
+    });
+
+    app.post("/create-payment-intent", async (req, res) => {
+      const booking = req.body;
+      const price = booking.price;
+      const amount = price * 100;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const result = await paymentCollection.insertOne(payment);
+      const id = payment.bookingId;
+      const query = { _id: ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          paid: true,
+          transictionId: payment.transictionId,
+        },
+      };
+      const updatedResult = await bookingsCollection.updateOne(
+        query,
+        updatedDoc
+      );
       res.send(result);
       console.log(result);
     });
@@ -178,7 +235,6 @@ async function run() {
         options
       );
       res.send(result);
-      console.log(result);
     });
 
     app.put("/users/admin/:id", async (req, res) => {
@@ -203,30 +259,37 @@ async function run() {
         updatedDoc,
         options
       );
-      console.log(result);
       res.send(result);
     });
+    app.put("/users/seller/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      console.log(filter);
+      const options = { upsert: true };
+      const updatedDoc = {
+        $set: {
+          status: "verify",
+        },
+      };
+      const result = await usersCollection.updateOne(
+        filter,
+        updatedDoc,
+        options
+      );
+      res.send(result);
+    });
+
     app.delete("/users/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: ObjectId(id) };
       const result = await usersCollection.deleteOne(query);
       res.send(result);
-      console.log(result);
     });
 
     app.post("/bookings", async (req, res) => {
       const booking = req.body;
       const bookings = await bookingsCollection.insertOne(booking);
-      console.log(bookings);
-      res.send(bookings);
-    });
 
-    app.get("/bookings/:email", async (req, res) => {
-      const email = req.params.email;
-      const query = { userEmail: email };
-      console.log(email);
-      const bookings = await bookingsCollection.find(query).toArray();
-      console.log(bookings);
       res.send(bookings);
     });
 
@@ -235,6 +298,19 @@ async function run() {
       const query = { email };
       const user = await usersCollection.findOne(query);
       res.send();
+    });
+
+    app.post("/wishlist", async (req, res) => {
+      const product = req.body;
+      const result = await wishlistCollection.insertOne(product);
+
+      res.send(result);
+    });
+
+    app.get("/wishlist", async (req, res) => {
+      const query = {};
+      const wishlist = await wishlistCollection.find(query).toArray();
+      res.send(wishlist);
     });
   } finally {
   }
